@@ -7,11 +7,6 @@ import (
 	"strconv"
 )
 
-type Cords struct {
-	x, y int
-	d    string
-}
-
 func main() {
 	in := bufio.NewReader(os.Stdin)
 	out := bufio.NewWriter(os.Stdout)
@@ -23,25 +18,38 @@ func main() {
 	for i := 0; i < t; i++ {
 		var n int
 		fmt.Fscan(in, &n)
-		fmt.Fprintln(out, minDigitPlates(n))
+		fmt.Fprintln(out, CountTablets(n))
 	}
 }
 
-func minDigitPlates(n int) int {
-	count := make([]int, 10)
+func CountTablets(num int) int {
+	res := 0
+	if num <= 9 {
+		res = num + 1
+	} else if num == 10 {
+		res = 10
+	} else {
+		res = Tables(num)
+	}
+	return res
+}
 
-	for i := n; i >= 0; i-- {
-		for _, digit := range strconv.Itoa(i) {
-			count[digit-'0']++
-		}
+func Tables(num int) int {
+	count := (len(strconv.Itoa(num)) - 1) * 10
+	numstr := strconv.Itoa(num)
+	dopnum := int(numstr[0] - '0')
+
+	srstr := ""
+	for i := 0; i < len(numstr); i++ {
+		srstr += strconv.Itoa(dopnum)
+	}
+	srnum, _ := strconv.Atoi(srstr)
+
+	if num >= srnum {
+		count += dopnum
+	} else {
+		count += dopnum - 1
 	}
 
-	maxPlates := 0
-	for _, v := range count {
-		if v > maxPlates {
-			maxPlates = v
-		}
-	}
-
-	return maxPlates
+	return count
 }

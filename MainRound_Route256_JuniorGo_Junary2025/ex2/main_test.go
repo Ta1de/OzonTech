@@ -13,56 +13,35 @@ import (
 )
 
 func TestMainFunction(t *testing.T) {
-	// Папка с тестовыми файлами
-	testFolder := "coundown"
+	testFolder := "countdown"
 
-	// Получаем список файлов из папки
 	files, err := os.ReadDir(testFolder)
 	if err != nil {
 		t.Fatalf("Ошибка при чтении папки с тестами: %v", err)
 	}
 
 	sort.Slice(files, func(i, j int) bool {
-		// Получаем имена файлов
-		nameI := files[i].Name()
-		nameJ := files[j].Name()
-
-		// Извлекаем числовую часть из имени файла
-		numberI := extractNumber(nameI)
-		numberJ := extractNumber(nameJ)
-
-		// Сравниваем числовые значения
-		return numberI < numberJ
+		return extractNumber(files[i].Name()) < extractNumber(files[j].Name())
 	})
 
-	// Проходимся по всем файлам
 	for _, file := range files {
-		if file.IsDir() {
+		if file.IsDir() || strings.HasSuffix(file.Name(), ".a") {
 			continue
 		}
 
 		inputFile := file.Name()
-		if strings.HasSuffix(inputFile, ".a") {
-			continue
-		}
-
 		expectedOutputFile := inputFile + ".a"
 
-		// Читаем входные данные
 		inputData, err := os.ReadFile(testFolder + "/" + inputFile)
 		if err != nil {
-			t.Errorf("Ошибка при чтении файла %s: %v", inputFile, err)
-			continue
+			t.Fatalf("Ошибка при чтении файла %s: %v", inputFile, err)
 		}
 
-		// Читаем ожидаемый результат
 		expectedOutputData, err := os.ReadFile(testFolder + "/" + expectedOutputFile)
 		if err != nil {
-			t.Errorf("Ошибка при чтении файла %s: %v", expectedOutputFile, err)
-			continue
+			t.Fatalf("Ошибка при чтении файла %s: %v", expectedOutputFile, err)
 		}
 
-		// Создаём контекст с тайм-аутом
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 
@@ -70,35 +49,40 @@ func TestMainFunction(t *testing.T) {
 		cmd.Stdin = bytes.NewReader(inputData)
 
 		startTime := time.Now()
-
-		// Выполняем команду
 		output, err := cmd.Output()
 		duration := time.Since(startTime)
 
-		// Проверяем тайм-аут
 		if ctx.Err() == context.DeadlineExceeded {
-			t.Errorf("Тест %s превысил лимит времени (3000 мс). Выполнение заняло %d мс", inputFile, duration.Milliseconds())
-			continue
+			t.Fatalf("Тест %s превысил лимит времени (3000 мс). Выполнение заняло %d мс", inputFile, duration.Milliseconds())
 		}
 
-		// Проверяем ошибки выполнения
 		if err != nil {
-			t.Errorf("Ошибка при выполнении main.go с входным файлом %s: %v", inputFile, err)
-			continue
+			t.Fatalf("Ошибка при выполнении main.go с входным файлом %s: %v", inputFile, err)
 		}
 
-		// Сравниваем результат
-		actualOutput := strings.TrimSpace(string(output))
-		expectedOutput := strings.TrimSpace(string(expectedOutputData))
-		if actualOutput != expectedOutput {
-			t.Errorf("Несоответствие для теста %s (время выполнения: %v):\nОжидалось:\n%s\nПолучено:\n%s",
-				inputFile, duration, expectedOutput, actualOutput)
-		} else {
-			t.Logf("Тест %s успешно пройден. Ожидание совпало с результатом. (время выполнения: %v)", inputFile, duration)
+		// Разбиваем входные данные, ожидаемый и фактический вывод на строки
+		inputLines := strings.Split(strings.TrimSpace(string(inputData)), "\n")
+		expectedLines := strings.Split(strings.TrimSpace(string(expectedOutputData)), "\n")
+		actualLines := strings.Split(strings.TrimSpace(string(output)), "\n")
+
+		// Проверяем количество строк
+		if len(actualLines) != len(expectedLines) {
+			t.Fatalf("Несовпадение количества строк в тесте %s:\nОжидалось: %d строк, Получено: %d строк",
+				inputFile, len(expectedLines), len(actualLines))
 		}
+
+		// Проверяем каждую строку
+		for i := 0; i < len(expectedLines); i++ {
+			if expectedLines[i] != actualLines[i] {
+				t.Fatalf("Ошибка в тесте %s (время выполнения: %v):\n"+
+					"Входные данные: %s\nОжидалось: %s\nПолучено: %s",
+					inputFile, duration, inputLines[i], expectedLines[i], actualLines[i])
+			}
+		}
+
+		t.Logf("Тест %s успешно пройден. (время выполнения: %v)", inputFile, duration)
 	}
 }
-
 func extractNumber(fileName string) int {
 	for i := 0; i < len(fileName); i++ {
 		if fileName[i] >= '0' && fileName[i] <= '9' {
